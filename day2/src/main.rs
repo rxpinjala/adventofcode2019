@@ -4,12 +4,28 @@ use std::io;
 
 fn main() {
     let input_path: &String = &env::args().nth(1).unwrap();
-    let mut input_data = read_input(&input_path).unwrap();
-    input_data[1] = 12;
-    input_data[2] = 2;
-    run_intcode(&mut input_data, 0).unwrap();
+    let input_data = read_input(&input_path).unwrap();
 
-    println!("Part 1 result: {}", input_data[0]);
+    let mut p1 = input_data.clone();
+    p1[1] = 12;
+    p1[2] = 2;
+    run_intcode(&mut p1, 0).unwrap();
+    println!("Part 1 result: {}", p1[0]);
+
+    for i in 0..100 {
+        for j in 0..100 {
+            let mut p2 = input_data.clone();
+            p2[1] = i;
+            p2[2] = j;
+            if let Ok(()) = run_intcode(&mut p2, 0) {
+                if p2[0] == 19690720 {
+                    println!("Part 2 result: {}", i * 100 + j);
+                    break;
+                }
+            }
+
+        }
+    }
 }
 
 fn read_input(path: &str) -> io::Result<Vec<i32>> {
