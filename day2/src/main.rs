@@ -10,7 +10,7 @@ fn main() {
     let mut p1 = input_data.clone();
     p1[1] = 12;
     p1[2] = 2;
-    intcode::run(&mut p1, 0).unwrap();
+    intcode::run(&mut p1, 0, vec!()).unwrap();
     println!("Part 1 result: {}", p1[0]);
 
     for i in 0..100 {
@@ -18,7 +18,7 @@ fn main() {
             let mut p2 = input_data.clone();
             p2[1] = i;
             p2[2] = j;
-            if let Ok(()) = intcode::run(&mut p2, 0) {
+            if let Ok(_) = intcode::run(&mut p2, 0, vec!()) {
                 if p2[0] == 19690720 {
                     println!("Part 2 result: {}", i * 100 + j);
                     break;
