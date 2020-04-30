@@ -185,6 +185,12 @@ pub fn run(p: &mut Vec<i32>, start: usize, input: Vec<i32>) -> Result<Vec<i32>, 
     Ok(output)
 }
 
+pub fn read_from_path(path: &str) -> std::io::Result<Vec<i32>> {
+    let contents = std::fs::read_to_string(path)?;
+    let numbers: Vec<i32> = contents.trim().split(',').map(|x| x.parse::<i32>().unwrap()).collect();
+    Ok(numbers)
+}
+
 #[cfg(test)]
 mod tests {
 use super::*;
