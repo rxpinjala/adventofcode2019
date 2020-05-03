@@ -223,7 +223,7 @@ fn test_decode_equal() {
     assert_eq!(inst, Inst::Equal(InParam::Immediate(1), InParam::Immediate(2), OutParam::Position(3)));
 }
 
-pub fn load(p: &[i32], param: &InParam) -> Result<i32, &'static str> {
+fn load(p: &[i32], param: &InParam) -> Result<i32, &'static str> {
     match param {
         InParam::Immediate(i) => Ok(*i),
         InParam::Position(i) => {
@@ -235,7 +235,7 @@ pub fn load(p: &[i32], param: &InParam) -> Result<i32, &'static str> {
     }
 }
 
-pub fn store(p: &mut[i32], param: &OutParam, value: i32) -> Result<(), &'static str> {
+fn store(p: &mut[i32], param: &OutParam, value: i32) -> Result<(), &'static str> {
     match param {
         OutParam::Position(i) => {
             if *i < 0 || *i >= p.len() as i32 {
@@ -319,9 +319,13 @@ pub fn run(p: &mut Vec<i32>, start: usize, input: Vec<i32>) -> Result<Vec<i32>, 
     Ok(output)
 }
 
+pub fn read_from_string(s: &str) -> Vec<i32> {
+    s.trim().split(',').map(|x| x.parse::<i32>().unwrap()).collect()
+}
+
 pub fn read_from_path(path: &str) -> std::io::Result<Vec<i32>> {
     let contents = std::fs::read_to_string(path)?;
-    let numbers: Vec<i32> = contents.trim().split(',').map(|x| x.parse::<i32>().unwrap()).collect();
+    let numbers: Vec<i32> = read_from_string(&contents);
     Ok(numbers)
 }
 
