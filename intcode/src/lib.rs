@@ -1,16 +1,38 @@
 
-#[derive(Debug, Eq, PartialEq)]
+use std::fmt;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InParam {
     Position(i32),
     Immediate(i32),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+impl fmt::Display for InParam {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InParam::Position(i) => 
+                write!(f, "[{}]", i),
+            InParam::Immediate(i) => 
+                write!(f, "{}", i)
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OutParam {
     Position(i32),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+impl fmt::Display for OutParam {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OutParam::Position(i) => 
+                write!(f, "[{}]", i)
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Inst {
     Add(InParam, InParam, OutParam),
     Mult(InParam, InParam, OutParam),
@@ -136,93 +158,6 @@ pub fn decode(p: &[i32], pc: usize) -> Result<Inst, &'static str> {
     }
 }
 
-#[test]
-fn test_decode_add() {
-    let inst = decode(&vec!(1,2,3,4)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Add(InParam::Position(2), InParam::Position(3), OutParam::Position(4)));
-
-    let inst = decode(&vec!(101,2,3,4)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Add(InParam::Immediate(2), InParam::Position(3), OutParam::Position(4)));
-
-    let inst = decode(&vec!(1001,2,3,4)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Add(InParam::Position(2), InParam::Immediate(3), OutParam::Position(4)));
-}
-
-#[test]
-fn test_decode_mult() {
-    let inst = decode(&vec!(2,2,3,4)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Mult(InParam::Position(2), InParam::Position(3), OutParam::Position(4)));
-
-    let inst = decode(&vec!(102,2,3,4)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Mult(InParam::Immediate(2), InParam::Position(3), OutParam::Position(4)));
-
-    let inst = decode(&vec!(1002,2,3,4)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Mult(InParam::Position(2), InParam::Immediate(3), OutParam::Position(4)));
-}
-
-#[test]
-fn test_decode_input() {
-    let inst = decode(&vec!(3,0)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Input(OutParam::Position(0)));
-}
-
-#[test]
-fn test_decode_output() {
-    let inst = decode(&vec!(4,0)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Output(InParam::Position(0)));
-
-    let inst = decode(&vec!(104,0)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Output(InParam::Immediate(0)));
-}
-
-#[test]
-fn test_decode_jumpiftrue() {
-    let inst = decode(&vec!(5,1,2)[..], 0).unwrap();
-    assert_eq!(inst, Inst::JumpIfTrue(InParam::Position(1), InParam::Position(2)));
-
-    let inst = decode(&vec!(105,1,2)[..], 0).unwrap();
-    assert_eq!(inst, Inst::JumpIfTrue(InParam::Immediate(1), InParam::Position(2)));
-
-    let inst = decode(&vec!(1105,1,2)[..], 0).unwrap();
-    assert_eq!(inst, Inst::JumpIfTrue(InParam::Immediate(1), InParam::Immediate(2)));
-}
-
-#[test]
-fn test_decode_jumpiffalse() {
-    let inst = decode(&vec!(6,1,2)[..], 0).unwrap();
-    assert_eq!(inst, Inst::JumpIfFalse(InParam::Position(1), InParam::Position(2)));
-
-    let inst = decode(&vec!(106,1,2)[..], 0).unwrap();
-    assert_eq!(inst, Inst::JumpIfFalse(InParam::Immediate(1), InParam::Position(2)));
-
-    let inst = decode(&vec!(1106,1,2)[..], 0).unwrap();
-    assert_eq!(inst, Inst::JumpIfFalse(InParam::Immediate(1), InParam::Immediate(2)));
-}
-
-#[test]
-fn test_decode_lessthan() {
-    let inst = decode(&vec!(7,1,2,3)[..], 0).unwrap();
-    assert_eq!(inst, Inst::LessThan(InParam::Position(1), InParam::Position(2), OutParam::Position(3)));
-
-    let inst = decode(&vec!(107,1,2,3)[..], 0).unwrap();
-    assert_eq!(inst, Inst::LessThan(InParam::Immediate(1), InParam::Position(2), OutParam::Position(3)));
-
-    let inst = decode(&vec!(1107,1,2,3)[..], 0).unwrap();
-    assert_eq!(inst, Inst::LessThan(InParam::Immediate(1), InParam::Immediate(2), OutParam::Position(3)));
-}
-
-#[test]
-fn test_decode_equal() {
-    let inst = decode(&vec!(8,1,2,3)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Equal(InParam::Position(1), InParam::Position(2), OutParam::Position(3)));
-
-    let inst = decode(&vec!(108,1,2,3)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Equal(InParam::Immediate(1), InParam::Position(2), OutParam::Position(3)));
-
-    let inst = decode(&vec!(1108,1,2,3)[..], 0).unwrap();
-    assert_eq!(inst, Inst::Equal(InParam::Immediate(1), InParam::Immediate(2), OutParam::Position(3)));
-}
-
 fn load(p: &[i32], param: &InParam) -> Result<i32, &'static str> {
     match param {
         InParam::Immediate(i) => Ok(*i),
@@ -247,76 +182,115 @@ fn store(p: &mut[i32], param: &OutParam, value: i32) -> Result<(), &'static str>
     }
 }
 
-pub fn run(p: &mut Vec<i32>, start: usize, input: Vec<i32>) -> Result<Vec<i32>, &'static str> {
-    let mut pc: usize = start;
+pub type PC = usize;
+
+#[derive(Debug)]
+pub enum RunResult {
+    Done,
+    WaitingForInput(PC),
+    Output(PC, i32)
+}
+
+pub fn run_step(p: &mut [i32], start: PC, input: Option<i32>) -> Result<RunResult, &'static str> {
+    let mut pc: PC = start;
     let mut input = input;
-    let mut output: Vec<i32> = Vec::new();
 
     loop {
         let inst = decode(&p[..], pc)?;
-        pc = pc + inst.len();
+        let mut next_pc = pc + inst.len();
         match &inst {
             Inst::Add(src1, src2, dst) => {
                 let p1 = load(&p[..], &src1)?;
                 let p2 = load(&p[..], &src2)?;
+                println!("{}: {} = ADD {} ({}) {} ({})", pc, dst, src1, p1, src2, p2);
                 store(&mut p[..], &dst, p1 + p2)?;
-                Ok(())
             },
             Inst::Mult(src1, src2, dst) => {
                 let p1 = load(&p[..], &src1)?;
                 let p2 = load(&p[..], &src2)?;
+                println!("{}: {} = MULT {} ({}) {} ({})", pc, dst, src1, p1, src2, p2);
                 store(&mut p[..], &dst, p1 * p2)?;
-                Ok(())
             },
             Inst::Input(dst) => {
-                let value = input.remove(0);
-                store(&mut p[..], &dst, value)?;
-                Ok(())
+                if let Some(input_value) = input {
+                    println!("{}: {} = INPUT {}", pc, dst, input_value);
+                    store(&mut p[..], &dst, input_value)?;
+                    input = Option::None;
+                } else {
+                    return Ok(RunResult::WaitingForInput(pc));
+                }
             },
             Inst::Output(src) => {
                 let p1 = load(&p[..], &src)?;
-                output.push(p1);
-                Ok(())
+                println!("{}: OUTPUT {} ({})", pc, src, p1);
+                return Ok(RunResult::Output(next_pc, p1));
             },
             Inst::JumpIfTrue(cond, target) => {
-                let cond = load(&p[..], &cond)?;
-                if cond != 0 {
-                    pc = load(&p[..], &target)? as usize;
+                let cond_value = load(&p[..], &cond)?;
+                let target_value = load(&p[..], &target)? as usize;
+                println!("{}: IF {} ({}) GOTO {} ({})", pc, cond, cond_value, target, target_value);
+                if cond_value != 0 {
+                    next_pc = target_value;
                 }
-                Ok(())
             },
             Inst::JumpIfFalse(cond, target) => {
-                let cond = load(&p[..], &cond)?;
-                if cond == 0 {
-                    pc = load(&p[..], &target)? as usize;
+                let cond_value = load(&p[..], &cond)?;
+                let target_value = load(&p[..], &target)? as usize;
+                println!("{}: IF NOT {} ({}) GOTO {} ({})", pc, cond, cond_value, target, target_value);
+                if cond_value == 0 {
+                    next_pc = target_value;
                 }
-                Ok(())
             },
             Inst::LessThan(src1, src2, dst) => {
                 let p1 = load(&p[..], &src1)?;
                 let p2 = load(&p[..], &src2)?;
+                println!("{}: {} = {} ({}) < {} ({})", pc, dst, src1, p1, src2, p2);
                 if p1 < p2 {
                     store(&mut p[..], &dst, 1)?;
                 } else {
                     store(&mut p[..], &dst, 0)?;
                 }
-                Ok(())
             }
             Inst::Equal(src1, src2, dst) => {
                 let p1 = load(&p[..], &src1)?;
                 let p2 = load(&p[..], &src2)?;
+                println!("{}: {} = {} ({}) == {} ({})", pc, dst, src1, p1, src2, p2);
                 if p1 == p2 {
                     store(&mut p[..], &dst, 1)?;
                 } else {
                     store(&mut p[..], &dst, 0)?;
                 }
-                Ok(())
             }
-            Inst::Exit => break
-        }?;
+            Inst::Exit => {
+                println!("{}: EXIT", pc);
+                return Ok(RunResult::Done);
+            }
+        };
+        pc = next_pc;
     }
+}
 
-    Ok(output)
+pub fn run(p: &mut Vec<i32>, start: usize, input: Vec<i32>) -> Result<Vec<i32>, &'static str> {
+    let mut pc: usize = start;
+    let mut input = input;
+    input.reverse();
+    let mut next_input = input.pop();
+    let mut output: Vec<i32> = Vec::new();
+
+    loop {
+        let result = run_step(&mut p[..], pc, next_input)?;
+        match result {
+            RunResult::Done => return Ok(output),
+            RunResult::Output(pc_new, val) => {
+                output.push(val);
+                pc = pc_new;
+            },
+            RunResult::WaitingForInput(pc_new) => {
+                next_input = input.pop();
+                pc = pc_new;
+            }
+        };
+    }
 }
 
 pub fn read_from_string(s: &str) -> Vec<i32> {
@@ -330,47 +304,4 @@ pub fn read_from_path(path: &str) -> std::io::Result<Vec<i32>> {
 }
 
 #[cfg(test)]
-mod tests {
-use super::*;
-
-#[test]
-fn provided_case_1() {
-    let mut p = vec!(1,9,10,3,2,3,11,0,99,30,40,50);
-    run(&mut p, 0, vec!()).unwrap();
-
-    assert_eq!(p, vec!(3500,9,10,70,2,3,11,0,99,30,40,50));
-}
-
-#[test]
-fn provided_case_2() {
-    let mut p = vec!(1,0,0,0,99);
-    run(&mut p, 0, vec!()).unwrap();
-
-    assert_eq!(p, vec!(2,0,0,0,99));
-}
-
-#[test]
-fn run_with_io() {
-    let mut p = vec!(3,1,99);
-    let result = run(&mut p, 0, vec!(7)).unwrap();
-    assert_eq!(p, vec!(3,7,99));
-    assert_eq!(result, vec!());
-
-    let mut p = vec!(3,5,104,10,4,11,99);
-    let result = run(&mut p, 0, vec!(0)).unwrap();
-    assert_eq!(p, vec!(3,5,104,10,4,0,99));
-    assert_eq!(result, vec!(10,3));
-}
-
-#[test]
-fn run_with_comparisons() {
-    let mut p = vec!(3,9,8,9,10,9,4,9,99,-1,8);
-    let result = run(&mut p, 0, vec!(7)).unwrap();
-    assert_eq!(result, vec!(0));
-
-    let mut p = vec!(3,9,8,9,10,9,4,9,99,-1,8);
-    let result = run(&mut p, 0, vec!(8)).unwrap();
-    assert_eq!(result, vec!(1));
-}
-
-}
+mod test;
