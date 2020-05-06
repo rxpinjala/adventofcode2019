@@ -1,8 +1,9 @@
 
+use std::collections::VecDeque;
 use std::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum InParam {
+enum InParam {
     Position(i32),
     Immediate(i32),
 }
@@ -19,7 +20,7 @@ impl fmt::Display for InParam {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum OutParam {
+enum OutParam {
     Position(i32),
 }
 
@@ -33,7 +34,7 @@ impl fmt::Display for OutParam {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Inst {
+enum Inst {
     Add(InParam, InParam, OutParam),
     Mult(InParam, InParam, OutParam),
     Input(OutParam),
@@ -61,7 +62,7 @@ impl Inst {
     }
 }
 
-pub fn decode(p: &[i32], pc: usize) -> Result<Inst, &'static str> {
+fn decode(p: &[i32], pc: usize) -> Result<Inst, &'static str> {
     if pc >= p.len() {
         return Err("Bad PC");
     }
@@ -158,141 +159,6 @@ pub fn decode(p: &[i32], pc: usize) -> Result<Inst, &'static str> {
     }
 }
 
-fn load(p: &[i32], param: &InParam) -> Result<i32, &'static str> {
-    match param {
-        InParam::Immediate(i) => Ok(*i),
-        InParam::Position(i) => {
-            if *i < 0 || *i >= p.len() as i32 {
-                return Err("Bad load address");
-            }
-            Ok(p[*i as usize])
-        }
-    }
-}
-
-fn store(p: &mut[i32], param: &OutParam, value: i32) -> Result<(), &'static str> {
-    match param {
-        OutParam::Position(i) => {
-            if *i < 0 || *i >= p.len() as i32 {
-                return Err("Bad store address");
-            }
-            p[*i as usize] = value;
-            Ok(())
-        }
-    }
-}
-
-pub type PC = usize;
-
-#[derive(Debug)]
-pub enum RunResult {
-    Done,
-    WaitingForInput(PC),
-    Output(PC, i32)
-}
-
-pub fn run_step(p: &mut [i32], start: PC, input: Option<i32>) -> Result<RunResult, &'static str> {
-    let mut pc: PC = start;
-    let mut input = input;
-
-    loop {
-        let inst = decode(&p[..], pc)?;
-        let mut next_pc = pc + inst.len();
-        match &inst {
-            Inst::Add(src1, src2, dst) => {
-                let p1 = load(&p[..], &src1)?;
-                let p2 = load(&p[..], &src2)?;
-                println!("{}: {} = ADD {} ({}) {} ({})", pc, dst, src1, p1, src2, p2);
-                store(&mut p[..], &dst, p1 + p2)?;
-            },
-            Inst::Mult(src1, src2, dst) => {
-                let p1 = load(&p[..], &src1)?;
-                let p2 = load(&p[..], &src2)?;
-                println!("{}: {} = MULT {} ({}) {} ({})", pc, dst, src1, p1, src2, p2);
-                store(&mut p[..], &dst, p1 * p2)?;
-            },
-            Inst::Input(dst) => {
-                if let Some(input_value) = input {
-                    println!("{}: {} = INPUT {}", pc, dst, input_value);
-                    store(&mut p[..], &dst, input_value)?;
-                    input = Option::None;
-                } else {
-                    return Ok(RunResult::WaitingForInput(pc));
-                }
-            },
-            Inst::Output(src) => {
-                let p1 = load(&p[..], &src)?;
-                println!("{}: OUTPUT {} ({})", pc, src, p1);
-                return Ok(RunResult::Output(next_pc, p1));
-            },
-            Inst::JumpIfTrue(cond, target) => {
-                let cond_value = load(&p[..], &cond)?;
-                let target_value = load(&p[..], &target)? as usize;
-                println!("{}: IF {} ({}) GOTO {} ({})", pc, cond, cond_value, target, target_value);
-                if cond_value != 0 {
-                    next_pc = target_value;
-                }
-            },
-            Inst::JumpIfFalse(cond, target) => {
-                let cond_value = load(&p[..], &cond)?;
-                let target_value = load(&p[..], &target)? as usize;
-                println!("{}: IF NOT {} ({}) GOTO {} ({})", pc, cond, cond_value, target, target_value);
-                if cond_value == 0 {
-                    next_pc = target_value;
-                }
-            },
-            Inst::LessThan(src1, src2, dst) => {
-                let p1 = load(&p[..], &src1)?;
-                let p2 = load(&p[..], &src2)?;
-                println!("{}: {} = {} ({}) < {} ({})", pc, dst, src1, p1, src2, p2);
-                if p1 < p2 {
-                    store(&mut p[..], &dst, 1)?;
-                } else {
-                    store(&mut p[..], &dst, 0)?;
-                }
-            }
-            Inst::Equal(src1, src2, dst) => {
-                let p1 = load(&p[..], &src1)?;
-                let p2 = load(&p[..], &src2)?;
-                println!("{}: {} = {} ({}) == {} ({})", pc, dst, src1, p1, src2, p2);
-                if p1 == p2 {
-                    store(&mut p[..], &dst, 1)?;
-                } else {
-                    store(&mut p[..], &dst, 0)?;
-                }
-            }
-            Inst::Exit => {
-                println!("{}: EXIT", pc);
-                return Ok(RunResult::Done);
-            }
-        };
-        pc = next_pc;
-    }
-}
-
-pub fn run(p: &mut Vec<i32>, start: usize, input: Vec<i32>) -> Result<Vec<i32>, &'static str> {
-    let mut pc: usize = start;
-    let mut input = input;
-    input.reverse();
-    let mut next_input = input.pop();
-    let mut output: Vec<i32> = Vec::new();
-
-    loop {
-        let result = run_step(&mut p[..], pc, next_input)?;
-        match result {
-            RunResult::Done => return Ok(output),
-            RunResult::Output(pc_new, val) => {
-                output.push(val);
-                pc = pc_new;
-            },
-            RunResult::WaitingForInput(pc_new) => {
-                next_input = input.pop();
-                pc = pc_new;
-            }
-        };
-    }
-}
-
 pub fn read_from_string(s: &str) -> Vec<i32> {
     s.trim().split(',').map(|x| x.parse::<i32>().unwrap()).collect()
 }
@@ -301,6 +167,158 @@ pub fn read_from_path(path: &str) -> std::io::Result<Vec<i32>> {
     let contents = std::fs::read_to_string(path)?;
     let numbers: Vec<i32> = read_from_string(&contents);
     Ok(numbers)
+}
+
+pub struct StepResult {
+    pub done: bool,
+    pub input_needed: bool,
+    pub output_available: bool,
+}
+
+impl StepResult {
+    fn ok(c: &Computer) -> Self {
+        StepResult{ done: false, input_needed: false, output_available: c.output.len() > 0 }
+    }
+
+    fn done(c: &Computer) -> Self {
+        StepResult{ done: true, input_needed: false, output_available: c.output.len() > 0 }
+    }
+
+    fn input_needed(c: &Computer) -> Self {
+        StepResult{ done: false, input_needed: true, output_available: c.output.len() > 0 }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Computer {
+    pub mem: Vec<i32>,
+    pub pc: usize,
+    pub input: VecDeque<i32>,
+    pub output: VecDeque<i32>,
+}
+
+impl Computer {
+    pub fn new(mem: Vec<i32>) -> Self {
+        Computer{ mem, pc: 0, input: VecDeque::new(), output: VecDeque::new() }
+    }
+
+    pub fn load_from_string(s: &str) -> Self {
+        let mem = s.trim().split(',').map(|x| x.parse::<i32>().unwrap()).collect();
+        Computer{ mem, pc: 0, input: VecDeque::new(), output: VecDeque::new() }
+    }
+
+    pub fn step(&mut self) -> Result<StepResult, &'static str> {
+        let inst = decode(&self.mem[..], self.pc)?;
+        let mut next_pc = self.pc + inst.len();
+
+        match &inst {
+            Inst::Add(src1, src2, dst) => {
+                let p1 = self.load(&src1)?;
+                let p2 = self.load(&src2)?;
+                println!("{}: {} = ADD {} ({}) {} ({})", self.pc, dst, src1, p1, src2, p2);
+                self.store(&dst, p1 + p2)?;
+            },
+            Inst::Mult(src1, src2, dst) => {
+                let p1 = self.load(&src1)?;
+                let p2 = self.load(&src2)?;
+                println!("{}: {} = MULT {} ({}) {} ({})", self.pc, dst, src1, p1, src2, p2);
+                self.store(&dst, p1 * p2)?;
+            },
+            Inst::Input(dst) => {
+                if let Some(input_value) = self.input.pop_front() {
+                    println!("{}: {} = INPUT {}", self.pc, dst, input_value);
+                    self.store(&dst, input_value)?;
+                } else {
+                    return Ok(StepResult::input_needed(&self));
+                }
+            },
+            Inst::Output(src) => {
+                let p1 = self.load(&src)?;
+                println!("{}: OUTPUT {} ({})", self.pc, src, p1);
+                self.output.push_back(p1);
+            },
+            Inst::JumpIfTrue(cond, target) => {
+                let cond_value = self.load(&cond)?;
+                let target_value = self.load(&target)? as usize;
+                println!("{}: IF {} ({}) GOTO {} ({})", self.pc, cond, cond_value, target, target_value);
+                if cond_value != 0 {
+                    next_pc = target_value;
+                }
+            },
+            Inst::JumpIfFalse(cond, target) => {
+                let cond_value = self.load(&cond)?;
+                let target_value = self.load(&target)? as usize;
+                println!("{}: IF NOT {} ({}) GOTO {} ({})", self.pc, cond, cond_value, target, target_value);
+                if cond_value == 0 {
+                    next_pc = target_value;
+                }
+            },
+            Inst::LessThan(src1, src2, dst) => {
+                let p1 = self.load(&src1)?;
+                let p2 = self.load(&src2)?;
+                println!("{}: {} = {} ({}) < {} ({})", self.pc, dst, src1, p1, src2, p2);
+                if p1 < p2 {
+                    self.store(&dst, 1)?;
+                } else {
+                    self.store(&dst, 0)?;
+                }
+            }
+            Inst::Equal(src1, src2, dst) => {
+                let p1 = self.load(&src1)?;
+                let p2 = self.load(&src2)?;
+                println!("{}: {} = {} ({}) == {} ({})", self.pc, dst, src1, p1, src2, p2);
+                if p1 == p2 {
+                    self.store(&dst, 1)?;
+                } else {
+                    self.store(&dst, 0)?;
+                }
+            }
+            Inst::Exit => {
+                println!("{}: EXIT", self.pc);
+                return Ok(StepResult::done(&self));
+            }
+        };
+        self.pc = next_pc;
+
+        Ok(StepResult::ok(&self))
+    }
+    
+    pub fn run(&mut self) -> Result<(), &'static str> {
+        loop {
+            let result = self.step()?;
+            if result.done {
+                return Ok(());
+            }
+        }
+    }
+
+    fn load(&self, param: &InParam) -> Result<i32, &'static str> {
+        match param {
+            InParam::Immediate(i) => Ok(*i),
+            InParam::Position(i) => {
+                if *i < 0 || *i >= self.mem.len() as i32 {
+                    return Err("Bad load address");
+                }
+                Ok(self.mem[*i as usize])
+            }
+        }
+    }
+    
+    fn store(&mut self, param: &OutParam, value: i32) -> Result<(), &'static str> {
+        match param {
+            OutParam::Position(i) => {
+                if *i < 0 || *i >= self.mem.len() as i32 {
+                    return Err("Bad store address");
+                }
+                self.mem[*i as usize] = value;
+                Ok(())
+            }
+        }
+    }
+    
+        pub fn take_output(&mut self) -> Vec<i32> {
+        self.output.drain(..).collect()
+    }
 }
 
 #[cfg(test)]

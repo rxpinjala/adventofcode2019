@@ -7,19 +7,19 @@ fn main() {
     let input_path: &String = &env::args().nth(1).unwrap();
     let input_data = read_input(&input_path).unwrap();
 
-    let mut p1 = input_data.clone();
-    p1[1] = 12;
-    p1[2] = 2;
-    intcode::run(&mut p1, 0, vec!()).unwrap();
-    println!("Part 1 result: {}", p1[0]);
+    let mut c = intcode::Computer::new(input_data.clone());
+    c.mem[1] = 12;
+    c.mem[2] = 2;
+    c.run().unwrap();
+    println!("Part 1 result: {}", c.mem[0]);
 
     for i in 0..100 {
         for j in 0..100 {
-            let mut p2 = input_data.clone();
-            p2[1] = i;
-            p2[2] = j;
-            if let Ok(_) = intcode::run(&mut p2, 0, vec!()) {
-                if p2[0] == 19690720 {
+            let mut c = intcode::Computer::new(input_data.clone());
+            c.mem[1] = i;
+            c.mem[2] = j;
+            if let Ok(_) = c.run() {
+                if c.mem[0] == 19690720 {
                     println!("Part 2 result: {}", i * 100 + j);
                     break;
                 }

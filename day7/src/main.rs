@@ -32,32 +32,23 @@ fn run_program_on_amps(p: &[i32], phases: &[i32]) -> Result<i32, &'static str> {
     let mut input: i32 = 0;
 
     for phase in phases.iter() {
-        let mut p = p.to_vec();
-        let output = intcode::run(&mut p, 0, vec!(*phase, input))?;
-        assert!(output.len() == 1);
-        input = output[0];
+        let mut c = intcode::Computer::new(p.to_vec());
+        c.input.push_back(*phase);
+        c.input.push_back(input);
+        c.run()?;
+        assert_eq!(c.output.len(), 1);
+        input = c.output[0];
     }
 
     Ok(input)
 }
 
 fn run_on_amps_with_feedback(p: &[i32], phases: &[i32]) -> Result<i32, &'static str> {
-    type Amp = (Vec<i32>, intcode::PC);    
-    let mut amps: Vec<Amp> = Vec::new();
-    for _ in phases {
-        amps.push((p.to_vec(), 0));
-    }
-
-    let mut next_phase = 0;
-    for (i,amp) in amps.iter_mut().enumerate() {
-        println!("Amp {}:", i);
-        let run_result = intcode::run_step(&mut amp.0, amp.1, Some(phases[next_phase]))?;
-        match run_result {
-            intcode::RunResult::Done => return Err("Program exited unexpectedly"),
-            intcode::RunResult::Output(_,_) => return Err("Program produced unexpected output"),
-            intcode::RunResult::WaitingForInput(pc) => amp.1 = pc
-        }
-        next_phase = next_phase + 1;
+    let mut amps: Vec<intcode::Computer> = Vec::new();
+    for phase in phases {
+        let mut amp = intcode::Computer::new(p.to_vec());
+        amp.input.push_back(*phase);
+        amps.push(amp);
     }
 
     let mut current_input: i32 = 0;
@@ -65,6 +56,20 @@ fn run_on_amps_with_feedback(p: &[i32], phases: &[i32]) -> Result<i32, &'static 
     loop {
         for (i,amp) in amps.iter_mut().enumerate() {
             println!("Amp {}:", i);
+
+            amp.input.push_back(current_input);
+            loop {
+                let result = amp.step()?;
+                if result.done {
+                    return Ok(current_input);
+                }
+                if result.output_available {
+                    current_input = amp.output.pop_front().unwrap();
+                    break;
+                }
+                assert!(!result.input_needed);
+            }
+/*
             let run_result = intcode::run_step(&mut amp.0, amp.1, Some(current_input))?;
             match run_result {
                 intcode::RunResult::Done => {
@@ -77,6 +82,7 @@ fn run_on_amps_with_feedback(p: &[i32], phases: &[i32]) -> Result<i32, &'static 
                 intcode::RunResult::WaitingForInput(_pc) =>
                     return Err("Expected output, but program wanted input")
             }
+            */
         }
 
         loop_limit = loop_limit - 1;

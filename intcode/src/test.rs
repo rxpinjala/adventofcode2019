@@ -90,65 +90,74 @@ fn test_decode_equal() {
 
 #[test]
 fn provided_case_1() {
-    let mut p = vec!(1,9,10,3,2,3,11,0,99,30,40,50);
-    run(&mut p, 0, vec!()).unwrap();
+    let mut c = Computer::new(vec!(1,9,10,3,2,3,11,0,99,30,40,50));
+    c.run().unwrap();
 
-    assert_eq!(p, vec!(3500,9,10,70,2,3,11,0,99,30,40,50));
+    assert_eq!(c.mem, vec!(3500,9,10,70,2,3,11,0,99,30,40,50));
 }
 
 #[test]
 fn provided_case_2() {
-    let mut p = vec!(1,0,0,0,99);
-    run(&mut p, 0, vec!()).unwrap();
+    let mut c = Computer::new(vec!(1,0,0,0,99));
+    c.run().unwrap();
 
-    assert_eq!(p, vec!(2,0,0,0,99));
+    assert_eq!(c.mem, vec!(2,0,0,0,99));
 }
 
 #[test]
 fn run_with_io() {
     // single input
-    let mut p = vec!(3,1,99);
-    let result = run(&mut p, 0, vec!(7)).unwrap();
-    assert_eq!(p, vec!(3,7,99));
-    assert_eq!(result, vec!());
+    let mut computer = Computer::new(vec!(3,1,99));
+    computer.input.push_back(7);
+    computer.run().unwrap();
+
+    assert_eq!(computer.mem, vec!(3,7,99));
+    assert_eq!(computer.output.len(), 0);
 
     // input + output
-    let mut p = vec!(3,5,104,10,4,11,99);
-    let result = run(&mut p, 0, vec!(0)).unwrap();
-    assert_eq!(p, vec!(3,5,104,10,4,0,99));
-    assert_eq!(result, vec!(10,3));
+    let mut computer = Computer::new(vec!(3,5,104,10,4,11,99));
+    computer.input.push_back(0);
+    computer.run().unwrap();
+
+    assert_eq!(computer.mem, vec!(3,5,104,10,4,0,99));
+    assert_eq!(computer.take_output(), vec!(10,3));
 }
 
 #[test]
 fn run_with_multiple_io() {
     // multiple inputs, multiple outputs
-    let mut p = vec!(3,13,3,14,3,15,4,15,4,14,4,13,99,0,0,0);
-    let result = run(&mut p, 0, vec!(22,33,44)).unwrap();
-    assert_eq!(p, vec!(3,13,3,14,3,15,4,15,4,14,4,13,99,22,33,44));
-    assert_eq!(result, vec!(44,33,22));
+    let mut c = Computer::new(vec!(3,13,3,14,3,15,4,15,4,14,4,13,99,0,0,0));
+    c.input.push_back(22);
+    c.input.push_back(33);
+    c.input.push_back(44);
+    c.run().unwrap();
+    assert_eq!(c.mem, vec!(3,13,3,14,3,15,4,15,4,14,4,13,99,22,33,44));
+    assert_eq!(c.take_output(), vec!(44,33,22));
 }
 
 #[test]
 fn run_with_branches() {
-    let mut p = vec!(
+    let mut c = Computer::new(vec!(
         1001,12,-1,12, // [12] = ADD [12],-1
         108,0,12,13,   // [13] = EQ 0,[12]
         1006,13,0,     // IF ![13] GOTO 0
         99,            // EXIT
-        10,0);         // 12, 13
-    let _ = run(&mut p, 0, vec!()).unwrap();
-    assert_eq!(p, vec!(1001,12,-1,12,108,0,12,13,1006,13,0,99,0,1));
+        10,0));        // 12, 13
+    c.run().unwrap();
+    assert_eq!(c.mem, vec!(1001,12,-1,12,108,0,12,13,1006,13,0,99,0,1));
 }
 
 #[test]
 fn run_with_comparisons() {
-    let mut p = vec!(3,9,8,9,10,9,4,9,99,-1,8);
-    let result = run(&mut p, 0, vec!(7)).unwrap();
-    assert_eq!(result, vec!(0));
+    let mut c = Computer::new(vec!(3,9,8,9,10,9,4,9,99,-1,8));
+    c.input.push_back(7);
+    c.run().unwrap();
+    assert_eq!(c.take_output(), vec!(0));
 
-    let mut p = vec!(3,9,8,9,10,9,4,9,99,-1,8);
-    let result = run(&mut p, 0, vec!(8)).unwrap();
-    assert_eq!(result, vec!(1));
+    let mut c = Computer::new(vec!(3,9,8,9,10,9,4,9,99,-1,8));
+    c.input.push_back(8);
+    c.run().unwrap();
+    assert_eq!(c.take_output(), vec!(1));
 }
 
 fn encode_opcode_ssd(op: i32, p1: InParam, p2: InParam, dst: OutParam) -> [i32;4] {
