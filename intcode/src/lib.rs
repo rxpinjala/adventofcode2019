@@ -4,13 +4,13 @@ use std::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum InParam {
-    Position(i32),
-    Immediate(i32),
-    Relative(i32),
+    Position(i64),
+    Immediate(i64),
+    Relative(i64),
 }
 
 impl InParam {
-    fn with_mode(mode: i32, value: i32) -> Result<Self, &'static str> {
+    fn with_mode(mode: i8, value: i64) -> Result<Self, &'static str> {
         match mode {
             0 => Ok(Self::Position(value)),
             1 => Ok(Self::Immediate(value)),
@@ -35,7 +35,7 @@ impl fmt::Display for InParam {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum OutParam {
-    Position(i32),
+    Position(i64),
 }
 
 impl fmt::Display for OutParam {
@@ -78,13 +78,13 @@ impl Inst {
     }
 }
 
-fn modes(opcode: i32) -> [i32; 4] {
-    let mut result = [0,0,0,0];
+fn modes(opcode: i64) -> [i8; 4] {
+    let mut result = [0 as i8,0,0,0];
     let mut i = 0;
     let mut m = opcode / 100;
 
     while m > 0 {
-        result[i] = m % 10;
+        result[i] = (m % 10) as i8;
         m = m / 10;
         i = i + 1;
     }
@@ -92,7 +92,7 @@ fn modes(opcode: i32) -> [i32; 4] {
     result
 }
 
-fn decode(p: &[i32], pc: usize) -> Result<Inst, &'static str> {
+fn decode(p: &[i64], pc: usize) -> Result<Inst, &'static str> {
     if pc >= p.len() {
         return Err("Bad PC");
     }
@@ -175,13 +175,13 @@ fn decode(p: &[i32], pc: usize) -> Result<Inst, &'static str> {
     }
 }
 
-pub fn read_from_string(s: &str) -> Vec<i32> {
-    s.trim().split(',').map(|x| x.parse::<i32>().unwrap()).collect()
+pub fn read_from_string(s: &str) -> Vec<i64> {
+    s.trim().split(',').map(|x| x.parse::<i64>().unwrap()).collect()
 }
 
-pub fn read_from_path(path: &str) -> std::io::Result<Vec<i32>> {
+pub fn read_from_path(path: &str) -> std::io::Result<Vec<i64>> {
     let contents = std::fs::read_to_string(path)?;
-    let numbers: Vec<i32> = read_from_string(&contents);
+    let numbers: Vec<i64> = read_from_string(&contents);
     Ok(numbers)
 }
 
@@ -207,23 +207,28 @@ impl StepResult {
 
 #[derive(Clone, Debug)]
 pub struct Computer {
-    pub mem: Vec<i32>,
+    pub mem: Vec<i64>,
     pub pc: usize,
-    pub relative_base: i32,
-    pub input: VecDeque<i32>,
-    pub output: VecDeque<i32>,
+    pub relative_base: i64,
+    pub input: VecDeque<i64>,
+    pub output: VecDeque<i64>,
 }
 
 impl Computer {
-    pub fn new(mem: Vec<i32>) -> Self {
+    pub fn new(mem: Vec<i64>) -> Self {
         Computer{ mem, pc: 0, relative_base: 0, input: VecDeque::new(), output: VecDeque::new() }
     }
 
     pub fn load_from_string(s: &str) -> Self {
-        let mem = s.trim().split(',').map(|x| x.parse::<i32>().unwrap()).collect();
+        let mem = s.trim().split(',').map(|x| x.parse::<i64>().unwrap()).collect();
         Computer{ mem, pc: 0, relative_base: 0, input: VecDeque::new(), output: VecDeque::new() }
     }
 
+    pub fn load_from_path(path: &str) -> std::io::Result<Self> {
+        let contents = std::fs::read_to_string(path)?;
+        Ok(Self::load_from_string(&contents))
+    }
+    
     pub fn step(&mut self) -> Result<StepResult, &'static str> {
         let inst = decode(&self.mem[..], self.pc)?;
         let mut next_pc = self.pc + inst.len();
@@ -314,14 +319,14 @@ impl Computer {
         }
     }
 
-    fn load(&self, param: &InParam) -> Result<i32, &'static str> {
+    fn load(&self, param: &InParam) -> Result<i64, &'static str> {
         match param {
             InParam::Immediate(i) => Ok(*i),
             InParam::Position(i) => {
                 if *i < 0 {
                     return Err("Bad load address");
                 }
-                if *i >= self.mem.len() as i32 {
+                if *i >= self.mem.len() as i64 {
                     return Ok(0);
                 }
                 Ok(self.mem[*i as usize])
@@ -331,7 +336,7 @@ impl Computer {
                 if i < 0 {
                     return Err("Bad rel load address");
                 }
-                if i >= self.mem.len() as i32 {
+                if i >= self.mem.len() as i64 {
                     return Ok(0);
                 }
                 Ok(self.mem[i as usize])
@@ -339,13 +344,13 @@ impl Computer {
         }
     }
     
-    fn store(&mut self, param: &OutParam, value: i32) -> Result<(), &'static str> {
+    fn store(&mut self, param: &OutParam, value: i64) -> Result<(), &'static str> {
         match param {
             OutParam::Position(i) => {
                 if *i < 0 {
                     return Err("Bad store address");
                 }
-                if *i >= self.mem.len() as i32 {
+                if *i >= self.mem.len() as i64 {
                     self.mem.resize(*i as usize + 1, 0);
                 }
                 self.mem[*i as usize] = value;
@@ -354,7 +359,7 @@ impl Computer {
         }
     }
     
-        pub fn take_output(&mut self) -> Vec<i32> {
+        pub fn take_output(&mut self) -> Vec<i64> {
         self.output.drain(..).collect()
     }
 }

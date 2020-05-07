@@ -29,9 +29,9 @@ fn main() {
     }
 }
 
-fn read_input(path: &str) -> io::Result<Vec<i32>> {
+fn read_input(path: &str) -> io::Result<Vec<i64>> {
     let contents = fs::read_to_string(path)?;
-    let numbers: Vec<i32> = contents.trim().split(',').map(|x| x.parse::<i32>().unwrap()).collect();
+    let numbers: Vec<i64> = contents.trim().split(',').map(|x| x.parse::<i64>().unwrap()).collect();
     Ok(numbers)
 }
 

@@ -5,8 +5,8 @@ fn main() {
     let input_path: &String = &env::args().nth(1).unwrap();
     let p = intcode::read_from_path(input_path).unwrap();
 
-    let phases: Vec<i32> = vec!(0, 1, 2, 3, 4);
-    let mut best: i32 = 0;
+    let phases: Vec<i64> = vec!(0, 1, 2, 3, 4);
+    let mut best: i64 = 0;
     for permutation in phases.into_iter().permutations(5) {
         let result = run_program_on_amps(&p, &permutation[..]).unwrap();
 
@@ -16,8 +16,8 @@ fn main() {
     }
     println!("Part 1: {}", best);
 
-    let phases: Vec<i32> = vec!(5, 6, 7, 8, 9);
-    let mut best: i32 = 0;
+    let phases: Vec<i64> = vec!(5, 6, 7, 8, 9);
+    let mut best: i64 = 0;
     for permutation in phases.into_iter().permutations(5) {
         let result = run_on_amps_with_feedback(&p, &permutation[..]).unwrap();
 
@@ -28,8 +28,8 @@ fn main() {
     println!("Part 2: {}", best);
 }
 
-fn run_program_on_amps(p: &[i32], phases: &[i32]) -> Result<i32, &'static str> {
-    let mut input: i32 = 0;
+fn run_program_on_amps(p: &[i64], phases: &[i64]) -> Result<i64, &'static str> {
+    let mut input: i64 = 0;
 
     for phase in phases.iter() {
         let mut c = intcode::Computer::new(p.to_vec());
@@ -43,7 +43,7 @@ fn run_program_on_amps(p: &[i32], phases: &[i32]) -> Result<i32, &'static str> {
     Ok(input)
 }
 
-fn run_on_amps_with_feedback(p: &[i32], phases: &[i32]) -> Result<i32, &'static str> {
+fn run_on_amps_with_feedback(p: &[i64], phases: &[i64]) -> Result<i64, &'static str> {
     let mut amps: Vec<intcode::Computer> = Vec::new();
     for phase in phases {
         let mut amp = intcode::Computer::new(p.to_vec());
@@ -51,7 +51,7 @@ fn run_on_amps_with_feedback(p: &[i32], phases: &[i32]) -> Result<i32, &'static 
         amps.push(amp);
     }
 
-    let mut current_input: i32 = 0;
+    let mut current_input: i64 = 0;
     let mut loop_limit = 1000;
     loop {
         for (i,amp) in amps.iter_mut().enumerate() {

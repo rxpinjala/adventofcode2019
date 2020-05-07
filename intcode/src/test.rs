@@ -168,3 +168,20 @@ fn day9_case_1() {
     c.run().unwrap();
     assert_eq!(input, c.take_output());
 }
+
+#[test]
+fn day9_case_2() {
+    // should output a 16-digit number
+    let mut c = Computer::new(vec!(1102,34915192,34915192,7,4,7,99,0));
+    c.run().unwrap();
+
+    let output_as_string = format!("{}", c.take_output()[0]);
+    assert_eq!(output_as_string.len(), 16);
+}
+
+#[test]
+fn day9_case_3() {
+    let mut c = Computer::new(vec!(104,1125899906842624,99));
+    c.run().unwrap();
+    assert_eq!(c.take_output()[0], 1125899906842624);
+}
