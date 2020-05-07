@@ -6,15 +6,29 @@ use std::fmt;
 enum InParam {
     Position(i32),
     Immediate(i32),
+    Relative(i32),
+}
+
+impl InParam {
+    fn with_mode(mode: i32, value: i32) -> Result<Self, &'static str> {
+        match mode {
+            0 => Ok(Self::Position(value)),
+            1 => Ok(Self::Immediate(value)),
+            2 => Ok(Self::Relative(value)),
+            _ => Err("Unrecognized mode"),
+        }
+    }
 }
 
 impl fmt::Display for InParam {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             InParam::Position(i) => 
-                write!(f, "[{}]", i),
+                write!(f, "p:{}", i),
             InParam::Immediate(i) => 
-                write!(f, "{}", i)
+                write!(f, "i:{}", i),
+            InParam::Relative(i) =>
+                write!(f, "rel:{}", i),
         }
     }
 }
@@ -43,6 +57,7 @@ enum Inst {
     JumpIfFalse(InParam, InParam),
     LessThan(InParam, InParam, OutParam),
     Equal(InParam, InParam, OutParam),
+    AdjustBase(InParam),
     Exit,
 }
 
@@ -58,8 +73,23 @@ impl Inst {
             Inst::JumpIfFalse(_,_) => 3,
             Inst::LessThan(_,_,_) => 4,
             Inst::Equal(_,_,_) => 4,
+            Inst::AdjustBase(_) => 2
         }
     }
+}
+
+fn modes(opcode: i32) -> [i32; 4] {
+    let mut result = [0,0,0,0];
+    let mut i = 0;
+    let mut m = opcode / 100;
+
+    while m > 0 {
+        result[i] = m % 10;
+        m = m / 10;
+        i = i + 1;
+    }
+
+    result
 }
 
 fn decode(p: &[i32], pc: usize) -> Result<Inst, &'static str> {
@@ -68,89 +98,75 @@ fn decode(p: &[i32], pc: usize) -> Result<Inst, &'static str> {
     }
 
     let opcode = p[pc] % 100;
-    let modes = p[pc] / 100;
+    let modes = modes(p[pc]);
     match opcode {
         1 => { // add
             let inst = p.get(pc..pc + 4).ok_or("Bad add instruction")?;
-            match modes {
-                0 => Ok(Inst::Add(InParam::Position(inst[1]), InParam::Position(inst[2]), OutParam::Position(inst[3]))),
-                1 => Ok(Inst::Add(InParam::Immediate(inst[1]), InParam::Position(inst[2]), OutParam::Position(inst[3]))),
-                10 => Ok(Inst::Add(InParam::Position(inst[1]), InParam::Immediate(inst[2]), OutParam::Position(inst[3]))),
-                11 => Ok(Inst::Add(InParam::Immediate(inst[1]), InParam::Immediate(inst[2]), OutParam::Position(inst[3]))),
-                _ => Err("Bad add instruction modes")
-            }
+            Ok(Inst::Add(
+                InParam::with_mode(modes[0], inst[1])?,
+                InParam::with_mode(modes[1], inst[2])?,
+                OutParam::Position(inst[3])
+            ))
         }
 
         2 => { // multiply
             let inst = p.get(pc..pc + 4).ok_or("Bad mul instruction")?;
-            match modes {
-                0 => Ok(Inst::Mult(InParam::Position(inst[1]), InParam::Position(inst[2]), OutParam::Position(inst[3]))),
-                1 => Ok(Inst::Mult(InParam::Immediate(inst[1]), InParam::Position(inst[2]), OutParam::Position(inst[3]))),
-                10 => Ok(Inst::Mult(InParam::Position(inst[1]), InParam::Immediate(inst[2]), OutParam::Position(inst[3]))),
-                11 => Ok(Inst::Mult(InParam::Immediate(inst[1]), InParam::Immediate(inst[2]), OutParam::Position(inst[3]))),
-                _ => Err("Bad mult instruction modes")
-            }
+            Ok(Inst::Mult(
+                InParam::with_mode(modes[0], inst[1])?,
+                InParam::with_mode(modes[1], inst[2])?,
+                OutParam::Position(inst[3])
+            ))
         }
 
         3 => { // input
             let inst = p.get(pc..pc + 2).ok_or("Bad input instruction")?;
-            match modes {
-                0 => Ok(Inst::Input(OutParam::Position(inst[1]))),
-                _ => Err("Bad mult instruction modes")
-            }
+            Ok(Inst::Input(OutParam::Position(inst[1])))
         }
 
         4 => { // output
             let inst = p.get(pc..pc + 2).ok_or("Bad output instruction")?;
-            match modes {
-                0 => Ok(Inst::Output(InParam::Position(inst[1]))),
-                1 => Ok(Inst::Output(InParam::Immediate(inst[1]))),
-                _ => Err("Bad mult instruction modes")
-            }
+            Ok(Inst::Output(InParam::with_mode(modes[0], inst[1])?))
         }
 
         5 => { // jump if true
             let inst = p.get(pc..pc + 3).ok_or("Bad jump-if-true instruction")?;
-            match modes {
-                0 => Ok(Inst::JumpIfTrue(InParam::Position(inst[1]), InParam::Position(inst[2]))),
-                1 => Ok(Inst::JumpIfTrue(InParam::Immediate(inst[1]), InParam::Position(inst[2]))),
-                10 => Ok(Inst::JumpIfTrue(InParam::Position(inst[1]), InParam::Immediate(inst[2]))),
-                11 => Ok(Inst::JumpIfTrue(InParam::Immediate(inst[1]), InParam::Immediate(inst[2]))),
-                _ => Err("Bad jump-if-true instruction modes")
-            }
+            Ok(Inst::JumpIfTrue(
+                InParam::with_mode(modes[0], inst[1])?,
+                InParam::with_mode(modes[1], inst[2])?
+            ))
         }
 
         6 => { // jump if false
             let inst = p.get(pc..pc + 3).ok_or("Bad jump-if-false instruction")?;
-            match modes {
-                0 => Ok(Inst::JumpIfFalse(InParam::Position(inst[1]), InParam::Position(inst[2]))),
-                1 => Ok(Inst::JumpIfFalse(InParam::Immediate(inst[1]), InParam::Position(inst[2]))),
-                10 => Ok(Inst::JumpIfFalse(InParam::Position(inst[1]), InParam::Immediate(inst[2]))),
-                11 => Ok(Inst::JumpIfFalse(InParam::Immediate(inst[1]), InParam::Immediate(inst[2]))),
-                _ => Err("Bad jump-if-false instruction modes")
-            }
+            Ok(Inst::JumpIfFalse(
+                InParam::with_mode(modes[0], inst[1])?,
+                InParam::with_mode(modes[1], inst[2])?
+            ))
         }
 
         7 => { // less than
             let inst = p.get(pc..pc + 4).ok_or("Bad less-than instruction")?;
-            match modes {
-                0 => Ok(Inst::LessThan(InParam::Position(inst[1]), InParam::Position(inst[2]), OutParam::Position(inst[3]))),
-                1 => Ok(Inst::LessThan(InParam::Immediate(inst[1]), InParam::Position(inst[2]), OutParam::Position(inst[3]))),
-                10 => Ok(Inst::LessThan(InParam::Position(inst[1]), InParam::Immediate(inst[2]), OutParam::Position(inst[3]))),
-                11 => Ok(Inst::LessThan(InParam::Immediate(inst[1]), InParam::Immediate(inst[2]), OutParam::Position(inst[3]))),
-                _ => Err("Bad less-than instruction modes")
-            }
+            Ok(Inst::LessThan(
+                InParam::with_mode(modes[0], inst[1])?,
+                InParam::with_mode(modes[1], inst[2])?,
+                OutParam::Position(inst[3])
+            ))
         }
 
         8 => { // equal
             let inst = p.get(pc..pc + 4).ok_or("Bad equal instruction")?;
-            match modes {
-                0 => Ok(Inst::Equal(InParam::Position(inst[1]), InParam::Position(inst[2]), OutParam::Position(inst[3]))),
-                1 => Ok(Inst::Equal(InParam::Immediate(inst[1]), InParam::Position(inst[2]), OutParam::Position(inst[3]))),
-                10 => Ok(Inst::Equal(InParam::Position(inst[1]), InParam::Immediate(inst[2]), OutParam::Position(inst[3]))),
-                11 => Ok(Inst::Equal(InParam::Immediate(inst[1]), InParam::Immediate(inst[2]), OutParam::Position(inst[3]))),
-                _ => Err("Bad equal instruction modes")
-            }
+            Ok(Inst::Equal(
+                InParam::with_mode(modes[0], inst[1])?,
+                InParam::with_mode(modes[1], inst[2])?,
+                OutParam::Position(inst[3])
+            ))
+        }
+
+        9 => { // adjust relative base
+            let inst = p.get(pc..pc + 2).ok_or("Bad adjust instruction")?;
+            Ok(Inst::AdjustBase(
+                InParam::with_mode(modes[0], inst[1])?
+            ))
         }
 
         99 => Ok(Inst::Exit),
@@ -193,18 +209,19 @@ impl StepResult {
 pub struct Computer {
     pub mem: Vec<i32>,
     pub pc: usize,
+    pub relative_base: i32,
     pub input: VecDeque<i32>,
     pub output: VecDeque<i32>,
 }
 
 impl Computer {
     pub fn new(mem: Vec<i32>) -> Self {
-        Computer{ mem, pc: 0, input: VecDeque::new(), output: VecDeque::new() }
+        Computer{ mem, pc: 0, relative_base: 0, input: VecDeque::new(), output: VecDeque::new() }
     }
 
     pub fn load_from_string(s: &str) -> Self {
         let mem = s.trim().split(',').map(|x| x.parse::<i32>().unwrap()).collect();
-        Computer{ mem, pc: 0, input: VecDeque::new(), output: VecDeque::new() }
+        Computer{ mem, pc: 0, relative_base: 0, input: VecDeque::new(), output: VecDeque::new() }
     }
 
     pub fn step(&mut self) -> Result<StepResult, &'static str> {
@@ -273,6 +290,11 @@ impl Computer {
                     self.store(&dst, 0)?;
                 }
             }
+            Inst::AdjustBase(src) => {
+                let p1 = self.load(&src)?;
+                self.relative_base = self.relative_base + p1;
+                println!("{}: ADJUST BASE BY {} ({}), NOW {}", self.pc, src, p1, self.relative_base);
+            }
             Inst::Exit => {
                 println!("{}: EXIT", self.pc);
                 return Ok(StepResult::done(&self));
@@ -296,10 +318,23 @@ impl Computer {
         match param {
             InParam::Immediate(i) => Ok(*i),
             InParam::Position(i) => {
-                if *i < 0 || *i >= self.mem.len() as i32 {
+                if *i < 0 {
                     return Err("Bad load address");
                 }
+                if *i >= self.mem.len() as i32 {
+                    return Ok(0);
+                }
                 Ok(self.mem[*i as usize])
+            },
+            InParam::Relative(i) => {
+                let i = i + self.relative_base;
+                if i < 0 {
+                    return Err("Bad rel load address");
+                }
+                if i >= self.mem.len() as i32 {
+                    return Ok(0);
+                }
+                Ok(self.mem[i as usize])
             }
         }
     }
@@ -307,8 +342,11 @@ impl Computer {
     fn store(&mut self, param: &OutParam, value: i32) -> Result<(), &'static str> {
         match param {
             OutParam::Position(i) => {
-                if *i < 0 || *i >= self.mem.len() as i32 {
+                if *i < 0 {
                     return Err("Bad store address");
+                }
+                if *i >= self.mem.len() as i32 {
+                    self.mem.resize(*i as usize + 1, 0);
                 }
                 self.mem[*i as usize] = value;
                 Ok(())
