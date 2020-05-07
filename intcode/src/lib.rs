@@ -24,9 +24,9 @@ impl fmt::Display for InParam {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             InParam::Position(i) => 
-                write!(f, "p:{}", i),
+                write!(f, "pos:{}", i),
             InParam::Immediate(i) => 
-                write!(f, "i:{}", i),
+                write!(f, "imm:{}", i),
             InParam::Relative(i) =>
                 write!(f, "rel:{}", i),
         }
@@ -36,13 +36,26 @@ impl fmt::Display for InParam {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum OutParam {
     Position(i64),
+    Relative(i64),
+}
+
+impl OutParam {
+    fn with_mode(mode: i8, value: i64) -> Result<Self, &'static str> {
+        match mode {
+            0 => Ok(Self::Position(value)),
+            2 => Ok(Self::Relative(value)),
+            _ => Err("Unrecognized mode"),
+        }
+    }
 }
 
 impl fmt::Display for OutParam {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             OutParam::Position(i) => 
-                write!(f, "[{}]", i)
+                write!(f, "pos:{}", i),
+            OutParam::Relative(i) =>
+                write!(f, "rel:{}", i),
         }
     }
 }
@@ -105,7 +118,7 @@ fn decode(p: &[i64], pc: usize) -> Result<Inst, &'static str> {
             Ok(Inst::Add(
                 InParam::with_mode(modes[0], inst[1])?,
                 InParam::with_mode(modes[1], inst[2])?,
-                OutParam::Position(inst[3])
+                OutParam::with_mode(modes[2], inst[3])?,
             ))
         }
 
@@ -114,13 +127,13 @@ fn decode(p: &[i64], pc: usize) -> Result<Inst, &'static str> {
             Ok(Inst::Mult(
                 InParam::with_mode(modes[0], inst[1])?,
                 InParam::with_mode(modes[1], inst[2])?,
-                OutParam::Position(inst[3])
+                OutParam::with_mode(modes[2], inst[3])?,
             ))
         }
 
         3 => { // input
             let inst = p.get(pc..pc + 2).ok_or("Bad input instruction")?;
-            Ok(Inst::Input(OutParam::Position(inst[1])))
+            Ok(Inst::Input(OutParam::with_mode(modes[0], inst[1])?))
         }
 
         4 => { // output
@@ -149,7 +162,7 @@ fn decode(p: &[i64], pc: usize) -> Result<Inst, &'static str> {
             Ok(Inst::LessThan(
                 InParam::with_mode(modes[0], inst[1])?,
                 InParam::with_mode(modes[1], inst[2])?,
-                OutParam::Position(inst[3])
+                OutParam::with_mode(modes[2], inst[3])?,
             ))
         }
 
@@ -158,7 +171,7 @@ fn decode(p: &[i64], pc: usize) -> Result<Inst, &'static str> {
             Ok(Inst::Equal(
                 InParam::with_mode(modes[0], inst[1])?,
                 InParam::with_mode(modes[1], inst[2])?,
-                OutParam::Position(inst[3])
+                OutParam::with_mode(modes[2], inst[3])?,
             ))
         }
 
@@ -354,6 +367,17 @@ impl Computer {
                     self.mem.resize(*i as usize + 1, 0);
                 }
                 self.mem[*i as usize] = value;
+                Ok(())
+            },
+            OutParam::Relative(i) => {
+                let i = i + self.relative_base;
+                if i < 0 {
+                    return Err("Bad rel store address");
+                }
+                if i >= self.mem.len() as i64 {
+                    self.mem.resize(i as usize + 1, 0);
+                }
+                self.mem[i as usize] = value;
                 Ok(())
             }
         }
