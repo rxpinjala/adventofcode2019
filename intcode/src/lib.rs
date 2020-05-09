@@ -383,7 +383,11 @@ impl Computer {
         }
     }
     
-        pub fn take_output(&mut self) -> Vec<i64> {
+    pub fn send_input(&mut self, value: i64) {
+        self.input.push_back(value);
+    }
+
+    pub fn take_output(&mut self) -> Vec<i64> {
         self.output.drain(..).collect()
     }
 }
