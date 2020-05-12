@@ -1,4 +1,3 @@
-
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
@@ -45,27 +44,39 @@ impl Vector3 {
             };
         }
 
-        if x.is_none() || y.is_none() || z.is_none() { 
+        if x.is_none() || y.is_none() || z.is_none() {
             return Err("Missing component: x,y,z required".to_string());
         }
 
-        Ok(Vector3{ x: x.unwrap(), y: y.unwrap(), z: z.unwrap() })
+        Ok(Vector3 {
+            x: x.unwrap(),
+            y: y.unwrap(),
+            z: z.unwrap(),
+        })
     }
 
     fn new(x: i32, y: i32, z: i32) -> Self {
-        Self{ x, y, z }
+        Self { x, y, z }
     }
 
     fn zero() -> Self {
-        Vector3{x: 0, y: 0, z: 0}
+        Vector3 { x: 0, y: 0, z: 0 }
     }
 
     fn add(v1: &Vector3, v2: &Vector3) -> Self {
-        Self{ x: v1.x + v2.x, y: v1.y + v2.y, z: v1.z + v2.z }
+        Self {
+            x: v1.x + v2.x,
+            y: v1.y + v2.y,
+            z: v1.z + v2.z,
+        }
     }
 
     fn sub(v1: &Vector3, v2: &Vector3) -> Self {
-        Self{ x: v1.x - v2.x, y: v1.y - v2.y, z: v1.z - v2.z }
+        Self {
+            x: v1.x - v2.x,
+            y: v1.y - v2.y,
+            z: v1.z - v2.z,
+        }
     }
 
     fn unit_scalar(v: i32) -> i32 {
@@ -79,7 +90,11 @@ impl Vector3 {
     }
 
     fn unit(&self) -> Vector3 {
-        Vector3{ x: Self::unit_scalar(self.x), y: Self::unit_scalar(self.y), z: Self::unit_scalar(self.z)}
+        Vector3 {
+            x: Self::unit_scalar(self.x),
+            y: Self::unit_scalar(self.y),
+            z: Self::unit_scalar(self.z),
+        }
     }
 
     fn get_x(&self) -> i32 {
@@ -103,11 +118,14 @@ struct Moon {
 
 impl Moon {
     fn new(position: Vector3, velocity: Vector3) -> Self {
-        Self{ position, velocity }
+        Self { position, velocity }
     }
 
     fn from_initial_position(p: &Vector3) -> Self {
-        Moon{ position: p.clone(), velocity: Vector3::zero() }
+        Moon {
+            position: p.clone(),
+            velocity: Vector3::zero(),
+        }
     }
 
     fn potential_energy(&self) -> i32 {
@@ -121,18 +139,24 @@ impl Moon {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct System {
-    moons: Vec<Moon>
+    moons: Vec<Moon>,
 }
 
 impl System {
     fn from_file(path: &str) -> Result<Self, String> {
-        let moons: Vec<Moon> = load_from_file(path)?.iter().map(Moon::from_initial_position).collect();
-        Ok(Self{ moons })
+        let moons: Vec<Moon> = load_from_file(path)?
+            .iter()
+            .map(Moon::from_initial_position)
+            .collect();
+        Ok(Self { moons })
     }
 
     fn from_string(s: &str) -> Result<Self, String> {
-        let moons: Vec<Moon> = load_from_string(s)?.iter().map(Moon::from_initial_position).collect();
-        Ok(Self{ moons })
+        let moons: Vec<Moon> = load_from_string(s)?
+            .iter()
+            .map(Moon::from_initial_position)
+            .collect();
+        Ok(Self { moons })
     }
 
     fn apply_gravity(&mut self) {
@@ -157,14 +181,17 @@ impl System {
     }
 
     fn total_energy(&self) -> i32 {
-        self.moons.iter()
+        self.moons
+            .iter()
             .map(|m| m.potential_energy() * m.kinetic_energy())
             .fold(0, |sum, e| sum + e)
     }
 }
 
-fn get_component_vector<F>(system: &System, component: F) -> Vec<i32> 
-where F: Fn(&Vector3) -> i32 {
+fn get_component_vector<F>(system: &System, component: F) -> Vec<i32>
+where
+    F: Fn(&Vector3) -> i32,
+{
     let mut result = Vec::new();
 
     for moon in system.moons.iter() {
@@ -176,8 +203,6 @@ where F: Fn(&Vector3) -> i32 {
 }
 
 fn find_cycle(mut system: System) -> Option<u64> {
-    
-
     let mut cycle_x: Option<u64> = None;
     let mut cycle_y: Option<u64> = None;
     let mut cycle_z: Option<u64> = None;
@@ -256,25 +281,37 @@ fn load_from_file(path: &str) -> Result<Vec<Vector3>, String> {
 
 #[test]
 fn test_load_from_string() {
-    assert_eq!(Vector3::from_string("<x=1,y=2,z=3>"), Ok(Vector3{x: 1, y: 2, z: 3}));
+    assert_eq!(
+        Vector3::from_string("<x=1,y=2,z=3>"),
+        Ok(Vector3 { x: 1, y: 2, z: 3 })
+    );
 
     assert_eq!(
         load_from_string("<x=1,y=2,z=3>\n<x=4,y=5,z=6>"),
-        Ok(vec!(Vector3{x: 1, y: 2, z: 3}, Vector3{x: 4, y: 5, z: 6}))
-)
+        Ok(vec!(
+            Vector3 { x: 1, y: 2, z: 3 },
+            Vector3 { x: 4, y: 5, z: 6 }
+        ))
+    )
 }
 
 #[test]
 fn provided_test_1() {
-    let mut system = System::from_string("
+    let mut system = System::from_string(
+        "
     <x=-1, y=0, z=2>
     <x=2, y=-10, z=-7>
     <x=4, y=-8, z=8>
     <x=3, y=5, z=-1>
-    ").unwrap();
+    ",
+    )
+    .unwrap();
 
     system.step();
-    assert_eq!(system.moons[0], Moon::new(Vector3::new(2, -1, 1), Vector3::new(3, -1, -1)));
+    assert_eq!(
+        system.moons[0],
+        Moon::new(Vector3::new(2, -1, 1), Vector3::new(3, -1, -1))
+    );
     assert_eq!(system.moons[1].velocity, Vector3::new(1, 3, 3));
 
     system.step();
@@ -291,4 +328,3 @@ fn provided_test_1() {
 
     assert_eq!(system.total_energy(), 179);
 }
-
