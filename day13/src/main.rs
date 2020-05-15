@@ -106,7 +106,7 @@ impl Game {
                     },
                 });
             }
-            println!("");
+            println!();
         }
     }
 

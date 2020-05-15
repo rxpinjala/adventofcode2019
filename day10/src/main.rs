@@ -35,7 +35,7 @@ struct Asteroid {
 }
 
 impl Asteroid {
-    fn relative_to(pt: &CartesianPoint, relative_to: &CartesianPoint) -> Self {
+    fn relative_to(pt: CartesianPoint, relative_to: CartesianPoint) -> Self {
         let rel_pt = CartesianPoint{ x: pt.x - relative_to.x, y: pt.y - relative_to.y };
         let rho_squared: i32 = (rel_pt.x * rel_pt.x) + (rel_pt.y * rel_pt.y);
         let rho = (rho_squared as f32).sqrt();
@@ -46,7 +46,7 @@ impl Asteroid {
         let theta = theta + std::f32::consts::FRAC_PI_2; // rotate 90 degrees, range -pi/2..3pi/2
         let theta = if theta < 0.0 { theta + std::f32::consts::PI * 2.0 } else { theta }; // shift range to 0..2pi
         let polar = PolarPoint{ rho, theta };
-        Asteroid{ abs: *pt, rel: rel_pt, polar }
+        Asteroid{ abs: pt, rel: rel_pt, polar }
     }
 }
 
@@ -100,23 +100,23 @@ impl Map {
         Ok(Map{data})
     }
 
-    fn count_position(&self, pos: &CartesianPoint) -> i32 {
+    fn count_position(&self, pos: CartesianPoint) -> i32 {
         self.data.iter()
-            .filter(|pt| *pt != pos)
-            .map(|pt| Asteroid::relative_to(pt, pos))
+            .filter(|pt| *pt != &pos)
+            .map(|pt| Asteroid::relative_to(*pt, pos))
             .map(|a| nearest_coordinate(a.rel))
             .collect::<BTreeSet<CartesianPoint>>()
             .len() as i32
     }
 
     fn count_best_position(&self) -> (CartesianPoint, i32) {
-        self.data.iter().map(|p| (*p, self.count_position(p))).max_by_key(|(_p, c)| *c).unwrap()
+        self.data.iter().map(|p| (*p, self.count_position(*p))).max_by_key(|(_p, c)| *c).unwrap()
     }
 
     fn laser_asteroids(&self, origin: CartesianPoint) -> Vec<CartesianPoint> {
         let mut asteroids: Vec<Asteroid> = self.data.iter()
             .filter(|pt| **pt != origin)
-            .map(|pt| Asteroid::relative_to(pt, &origin))
+            .map(|pt| Asteroid::relative_to(*pt, origin))
             .collect();
         asteroids.sort_by(|a1, a2| a1.polar.theta.partial_cmp(&a2.polar.theta).unwrap());
 
@@ -129,7 +129,7 @@ impl Map {
         //dbg!(&groups);
         
         let mut result: Vec<CartesianPoint> = Vec::new();
-        while groups.len() > 0 {
+        while !groups.is_empty() {
             for group in &mut groups {
                 let nearest_index = group.iter().enumerate()
                     .min_by_key(|a| a.1.polar.rho as i32).unwrap().0;
@@ -138,7 +138,7 @@ impl Map {
                 group.remove(nearest_index);
             }
 
-            groups.retain(|group| group.len() > 0);
+            groups.retain(|group| !group.is_empty());
         }
 
         result
@@ -158,22 +158,22 @@ fn main() {
 
 #[test]
 fn test_asteroid_math() {
-    let a = Asteroid::relative_to(&CartesianPoint::new(0, -1), &CartesianPoint::origin());
+    let a = Asteroid::relative_to(CartesianPoint::new(0, -1), CartesianPoint::origin());
     dbg!(&a);
     assert_eq!(a.polar.rho, 1.0);
     assert_eq!(a.polar.theta, 0.0);
 
-    let a = Asteroid::relative_to(&CartesianPoint::new(1, 0), &CartesianPoint::origin());
+    let a = Asteroid::relative_to(CartesianPoint::new(1, 0), CartesianPoint::origin());
     dbg!(&a);
     assert_eq!(a.polar.rho, 1.0);
     assert_eq!(a.polar.theta, std::f32::consts::PI / 2.0);
 
-    let a = Asteroid::relative_to(&CartesianPoint::new(0, 1), &CartesianPoint::origin());
+    let a = Asteroid::relative_to(CartesianPoint::new(0, 1), CartesianPoint::origin());
     dbg!(&a);
     assert_eq!(a.polar.rho, 1.0);
     assert_eq!(a.polar.theta, std::f32::consts::PI);
 
-    let a = Asteroid::relative_to(&CartesianPoint::new(-1, 0), &CartesianPoint::origin());
+    let a = Asteroid::relative_to(CartesianPoint::new(-1, 0), CartesianPoint::origin());
     dbg!(&a);
     assert_eq!(a.polar.rho, 1.0);
     assert_eq!(a.polar.theta, std::f32::consts::PI * 3.0 / 2.0);
@@ -189,7 +189,7 @@ fn provided_case_1() {
 ...##";
     let map = Map::load_from_string(input).unwrap();
 
-    assert_eq!(map.count_position(&CartesianPoint{x: 3, y: 4}), 8);
+    assert_eq!(map.count_position(CartesianPoint{x: 3, y: 4}), 8);
 
     assert_eq!(map.count_best_position().1, 8);
 }

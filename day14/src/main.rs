@@ -24,14 +24,14 @@ impl ChemicalAmount {
         }
     }
 
-    fn to_string(&self) -> String {
+    fn as_string(&self) -> String {
         format!("{} {}", self.quantity, self.name)
     }
 }
 
 impl std::fmt::Debug for ChemicalAmount {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{}", self.as_string())
     }
 }
 
@@ -58,15 +58,15 @@ impl Reaction {
         Ok(Self { inputs, output })
     }
 
-    fn to_string(&self) -> String {
-        let input_str = self.inputs.iter().map(|i| i.to_string()).collect::<Vec<String>>().join(", ");
-        format!("<{} => {}>", input_str, self.output.to_string())
+    fn as_string(&self) -> String {
+        let input_str = self.inputs.iter().map(|i| i.as_string()).collect::<Vec<String>>().join(", ");
+        format!("<{} => {}>", input_str, self.output.as_string())
     }
 }
 
 impl std::fmt::Debug for Reaction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{}", self.as_string())
     }
 }
 
@@ -127,13 +127,13 @@ fn find_missing_requirements<'a>(reaction_counts: &[ReactionCount<'a>]) -> BTree
         for input in rc.reaction.inputs.iter() {
             let consumed_quantity = (input.quantity as u64 * rc.count) as i64;
             let quantity = result.entry(&input.name).or_insert(0);
-            *quantity = *quantity - consumed_quantity;
+            *quantity -= consumed_quantity;
         }
 
         let output = &rc.reaction.output;
         let produced_quantity = (output.quantity as u64 * rc.count) as i64;
         let quantity = result.entry(&output.name).or_insert(0);
-        *quantity = *quantity + produced_quantity;
+        *quantity += produced_quantity;
     }
 
     result.into_iter().filter(|(_, v)| *v < 0).map(|(k, v)| (k, -v)).collect()
@@ -157,7 +157,7 @@ fn compute_ore_cost(reactions: &[Reaction], needed_fuel: u64) -> u64 {
         for rc in reaction_counts.iter_mut() {
             if rc.reaction.output.name == *missing_chemical {
                 let multiple = get_multiple(*needed_count as u64, rc.reaction.output.quantity as u64);
-                rc.count = rc.count + multiple;
+                rc.count += multiple;
             }
         }
 
@@ -169,7 +169,7 @@ fn compute_ore_cost(reactions: &[Reaction], needed_fuel: u64) -> u64 {
         }
         missing_requirements = new_missing_requirements;
 
-        max_iterations = max_iterations - 1;
+        max_iterations -= 1;
         if max_iterations == 0 {
             panic!("Too many iterations");
         }
@@ -218,10 +218,10 @@ fn test_case_2() {
 }
 
 fn part2(reactions: &[Reaction]) {
-    let available_ore: u64 = 1000000000000;
+    let available_ore: u64 = 1_000_000_000_000;
 
     let mut lower_bound = 1;
-    let mut upper_bound = 1000000000;
+    let mut upper_bound = 1_000_000_000;
 
     assert!(compute_ore_cost(reactions, upper_bound) > available_ore);
 

@@ -184,7 +184,7 @@ impl System {
         self.moons
             .iter()
             .map(|m| m.potential_energy() * m.kinetic_energy())
-            .fold(0, |sum, e| sum + e)
+            .sum()
     }
 }
 

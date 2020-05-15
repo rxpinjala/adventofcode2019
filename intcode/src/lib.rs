@@ -98,8 +98,8 @@ fn modes(opcode: i64) -> [i8; 4] {
 
     while m > 0 {
         result[i] = (m % 10) as i8;
-        m = m / 10;
-        i = i + 1;
+        m /= 10;
+        i += 1;
     }
 
     result
@@ -206,15 +206,15 @@ pub struct StepResult {
 
 impl StepResult {
     fn ok(c: &Computer) -> Self {
-        StepResult{ done: false, input_needed: false, output_available: c.output.len() > 0 }
+        StepResult{ done: false, input_needed: false, output_available: !c.output.is_empty() }
     }
 
     fn done(c: &Computer) -> Self {
-        StepResult{ done: true, input_needed: false, output_available: c.output.len() > 0 }
+        StepResult{ done: true, input_needed: false, output_available: !c.output.is_empty() }
     }
 
     fn input_needed(c: &Computer) -> Self {
-        StepResult{ done: false, input_needed: true, output_available: c.output.len() > 0 }
+        StepResult{ done: false, input_needed: true, output_available: !c.output.is_empty() }
     }
 }
 
@@ -225,16 +225,18 @@ pub struct Computer {
     pub relative_base: i64,
     pub input: VecDeque<i64>,
     pub output: VecDeque<i64>,
+
+    pub enable_tracing: bool,
 }
 
 impl Computer {
     pub fn new(mem: Vec<i64>) -> Self {
-        Computer{ mem, pc: 0, relative_base: 0, input: VecDeque::new(), output: VecDeque::new() }
+        Computer{ mem, pc: 0, relative_base: 0, input: VecDeque::new(), output: VecDeque::new(), enable_tracing: false }
     }
 
     pub fn load_from_string(s: &str) -> Self {
         let mem = s.trim().split(',').map(|x| x.parse::<i64>().unwrap()).collect();
-        Computer{ mem, pc: 0, relative_base: 0, input: VecDeque::new(), output: VecDeque::new() }
+        Computer{ mem, pc: 0, relative_base: 0, input: VecDeque::new(), output: VecDeque::new(), enable_tracing: false }
     }
 
     pub fn load_from_path(path: &str) -> std::io::Result<Self> {
@@ -242,6 +244,12 @@ impl Computer {
         Ok(Self::load_from_string(&contents))
     }
     
+    fn trace(&self, s: &str) {
+        if self.enable_tracing {
+            println!("{}", s);
+        }
+    }
+
     pub fn step(&mut self) -> Result<StepResult, &'static str> {
         let inst = decode(&self.mem[..], self.pc)?;
         let mut next_pc = self.pc + inst.len();
@@ -250,18 +258,18 @@ impl Computer {
             Inst::Add(src1, src2, dst) => {
                 let p1 = self.load(&src1)?;
                 let p2 = self.load(&src2)?;
-                println!("{}: {} = ADD {} ({}) {} ({})", self.pc, dst, src1, p1, src2, p2);
+                self.trace(&format!("{}: {} = ADD {} ({}) {} ({})", self.pc, dst, src1, p1, src2, p2));
                 self.store(&dst, p1 + p2)?;
             },
             Inst::Mult(src1, src2, dst) => {
                 let p1 = self.load(&src1)?;
                 let p2 = self.load(&src2)?;
-                println!("{}: {} = MULT {} ({}) {} ({})", self.pc, dst, src1, p1, src2, p2);
+                self.trace(&format!("{}: {} = MULT {} ({}) {} ({})", self.pc, dst, src1, p1, src2, p2));
                 self.store(&dst, p1 * p2)?;
             },
             Inst::Input(dst) => {
                 if let Some(input_value) = self.input.pop_front() {
-                    println!("{}: {} = INPUT {}", self.pc, dst, input_value);
+                    self.trace(&format!("{}: {} = INPUT {}", self.pc, dst, input_value));
                     self.store(&dst, input_value)?;
                 } else {
                     return Ok(StepResult::input_needed(&self));
@@ -269,13 +277,13 @@ impl Computer {
             },
             Inst::Output(src) => {
                 let p1 = self.load(&src)?;
-                println!("{}: OUTPUT {} ({})", self.pc, src, p1);
+                self.trace(&format!("{}: OUTPUT {} ({})", self.pc, src, p1));
                 self.output.push_back(p1);
             },
             Inst::JumpIfTrue(cond, target) => {
                 let cond_value = self.load(&cond)?;
                 let target_value = self.load(&target)? as usize;
-                println!("{}: IF {} ({}) GOTO {} ({})", self.pc, cond, cond_value, target, target_value);
+                self.trace(&format!("{}: IF {} ({}) GOTO {} ({})", self.pc, cond, cond_value, target, target_value));
                 if cond_value != 0 {
                     next_pc = target_value;
                 }
@@ -283,7 +291,7 @@ impl Computer {
             Inst::JumpIfFalse(cond, target) => {
                 let cond_value = self.load(&cond)?;
                 let target_value = self.load(&target)? as usize;
-                println!("{}: IF NOT {} ({}) GOTO {} ({})", self.pc, cond, cond_value, target, target_value);
+                self.trace(&format!("{}: IF NOT {} ({}) GOTO {} ({})", self.pc, cond, cond_value, target, target_value));
                 if cond_value == 0 {
                     next_pc = target_value;
                 }
@@ -291,7 +299,7 @@ impl Computer {
             Inst::LessThan(src1, src2, dst) => {
                 let p1 = self.load(&src1)?;
                 let p2 = self.load(&src2)?;
-                println!("{}: {} = {} ({}) < {} ({})", self.pc, dst, src1, p1, src2, p2);
+                self.trace(&format!("{}: {} = {} ({}) < {} ({})", self.pc, dst, src1, p1, src2, p2));
                 if p1 < p2 {
                     self.store(&dst, 1)?;
                 } else {
@@ -301,7 +309,7 @@ impl Computer {
             Inst::Equal(src1, src2, dst) => {
                 let p1 = self.load(&src1)?;
                 let p2 = self.load(&src2)?;
-                println!("{}: {} = {} ({}) == {} ({})", self.pc, dst, src1, p1, src2, p2);
+                self.trace(&format!("{}: {} = {} ({}) == {} ({})", self.pc, dst, src1, p1, src2, p2));
                 if p1 == p2 {
                     self.store(&dst, 1)?;
                 } else {
@@ -310,11 +318,11 @@ impl Computer {
             }
             Inst::AdjustBase(src) => {
                 let p1 = self.load(&src)?;
-                self.relative_base = self.relative_base + p1;
-                println!("{}: ADJUST BASE BY {} ({}), NOW {}", self.pc, src, p1, self.relative_base);
+                self.relative_base += p1;
+                self.trace(&format!("{}: ADJUST BASE BY {} ({}), NOW {}", self.pc, src, p1, self.relative_base));
             }
             Inst::Exit => {
-                println!("{}: EXIT", self.pc);
+                self.trace(&format!("{}: EXIT", self.pc));
                 return Ok(StepResult::done(&self));
             }
         };
