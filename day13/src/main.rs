@@ -1,7 +1,5 @@
 use std::collections::BTreeMap;
 use std::env;
-use std::io;
-use std::io::Read;
 
 fn main() {
     let input_path: &String = &env::args().nth(1).unwrap();

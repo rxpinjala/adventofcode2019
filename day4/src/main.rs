@@ -59,7 +59,9 @@ fn valid_password(n: u32) -> bool {
 
 #[test]
 fn test_valid_password() {
-    assert!(valid_password(111111));
+    if !PART2 {
+        assert!(valid_password(111111));
+    }
     assert!(!valid_password(223450));
     assert!(!valid_password(123789));
 }

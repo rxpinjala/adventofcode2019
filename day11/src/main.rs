@@ -21,10 +21,6 @@ impl Grid {
         Grid{current_position: (0, 0), current_direction: 0, painted_points: BTreeMap::new()}
     }
 
-    fn is_painted(&self, pt: Point) -> bool {
-        self.painted_points.contains_key(&pt)
-    }
-
     fn color_at(&self, pt: Point) -> Color {
         match self.painted_points.get(&pt) {
             Some(color) => *color,

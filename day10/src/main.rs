@@ -191,7 +191,7 @@ fn provided_case_1() {
 
     assert_eq!(map.count_position(&CartesianPoint{x: 3, y: 4}), 8);
 
-    assert_eq!(map.count_best_position(), 8);
+    assert_eq!(map.count_best_position().1, 8);
 }
 
 #[test]
