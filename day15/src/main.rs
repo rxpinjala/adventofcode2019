@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::env;
 
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -255,8 +255,8 @@ fn main() -> Result<(), String> {
     let computer = intcode::Computer::load_from_path(input_path)
         .map_err(|err| format!("Couldn't load input file: {}", err))?;
 
-    let map = part1(computer.clone())?;
-    part2(map, computer)?;
+    let map = part1(computer)?;
+    part2(map)?;
     Ok(())
 }
 
@@ -337,13 +337,12 @@ fn part1(computer: intcode::Computer) -> Result<Map, String> {
     Ok(map)
 }
 
-fn part2(map: Map, computer: intcode::Computer) -> Result<(), String> {
+fn part2(map: Map) -> Result<(), String> {
     let mut filled_points: BTreeMap<Point, u32> = BTreeMap::new();
-    let droid = Droid::new(computer);
 
     let mut generation: u32 = 0;
     let oxygen_thing_location = *map.points.iter()
-        .filter(|(k, v)| **v == State::OxygenThing)
+        .filter(|(_, v)| **v == State::OxygenThing)
         .nth(0)
         .ok_or("couldn't find oxygen thing from part 1".to_string())?.0;    
     filled_points.insert(oxygen_thing_location, generation);
