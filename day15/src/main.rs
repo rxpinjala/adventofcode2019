@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -17,9 +17,9 @@ impl std::ops::Add<Self> for Point {
     type Output = Point;
 
     fn add(self, other: Self) -> Self {
-        Point { 
-            x: self.x + other.x, 
-            y: self.y + other.y
+        Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
         }
     }
 }
@@ -60,7 +60,7 @@ impl Direction {
             (-1, 0) => Self::West,
             (0, -1) => Self::North,
             (0, 1) => Self::South,
-            _ => panic!("Bad directions")
+            _ => panic!("Bad directions"),
         }
     }
 
@@ -103,9 +103,9 @@ struct Droid {
 
 impl Droid {
     fn new(computer: intcode::Computer) -> Self {
-        Self { 
-            computer, 
-            current_position: Point::new(0, 0)
+        Self {
+            computer,
+            current_position: Point::new(0, 0),
         }
     }
 
@@ -130,7 +130,7 @@ impl Droid {
                     Status::Moved => Ok((status, self.current_position)),
                     Status::HitAWall => Ok((status, self.current_position + direction.vector())),
                     Status::FoundTheThing => Ok((status, self.current_position)),
-                }
+                };
             }
         }
     }
@@ -175,7 +175,6 @@ impl Map {
         max_x += 3;
         min_y -= 2;
         max_y += 3;
-        
 
         for y in min_y..max_y {
             for x in min_x..max_x {
@@ -220,7 +219,8 @@ impl Map {
         loop {
             let mut new_path_points: BTreeMap<Point, Point> = BTreeMap::new();
             let mut add_path_point_if_navigable = |point: Point, new_point: Point| {
-                if self.get_point(new_point) != State::Wall && !path_points.contains_key(&new_point) {
+                if self.get_point(new_point) != State::Wall && !path_points.contains_key(&new_point)
+                {
                     new_path_points.insert(new_point, point);
                 }
             };
@@ -255,12 +255,13 @@ fn main() -> Result<(), String> {
     let computer = intcode::Computer::load_from_path(input_path)
         .map_err(|err| format!("Couldn't load input file: {}", err))?;
 
-    part1(computer.clone())?;
+    let map = part1(computer.clone())?;
+    part2(map, computer)?;
     Ok(())
 }
 
-fn part1(computer: intcode::Computer) -> Result<(), String> {
-    let mut droid = Droid::new(computer);    
+fn part1(computer: intcode::Computer) -> Result<Map, String> {
+    let mut droid = Droid::new(computer);
     let mut map = Map::new();
     let initial_position = Point::new(0, 0);
     map.points.insert(initial_position, State::Clear);
@@ -271,11 +272,15 @@ fn part1(computer: intcode::Computer) -> Result<(), String> {
     loop {
         if map.get_point(droid.current_position + Direction::North.vector()) == State::Unknown {
             current_direction = Direction::North;
-        } else if map.get_point(droid.current_position + Direction::South.vector()) == State::Unknown {
+        } else if map.get_point(droid.current_position + Direction::South.vector())
+            == State::Unknown
+        {
             current_direction = Direction::South;
-        } else if map.get_point(droid.current_position + Direction::East.vector()) == State::Unknown {
+        } else if map.get_point(droid.current_position + Direction::East.vector()) == State::Unknown
+        {
             current_direction = Direction::East;
-        } else if map.get_point(droid.current_position + Direction::West.vector()) == State::Unknown {
+        } else if map.get_point(droid.current_position + Direction::West.vector()) == State::Unknown
+        {
             current_direction = Direction::West;
         }
 
@@ -305,12 +310,16 @@ fn part1(computer: intcode::Computer) -> Result<(), String> {
 
         return_path = map.find_possible_path(oxygen_thing_location.unwrap(), initial_position)?;
 
-        let first_unknown_point = return_path.iter().filter(|pt| map.get_point(**pt) == State::Unknown).nth(0);
+        let first_unknown_point = return_path
+            .iter()
+            .filter(|pt| map.get_point(**pt) == State::Unknown)
+            .nth(0);
         if first_unknown_point.is_none() {
             break;
         }
 
-        let test_path = map.find_possible_path(droid.current_position, *first_unknown_point.unwrap())?;
+        let test_path =
+            map.find_possible_path(droid.current_position, *first_unknown_point.unwrap())?;
         for next_point in test_path.iter() {
             let direction = Direction::from_points(droid.current_position, *next_point);
             let (status, point) = droid.try_move(direction)?;
@@ -325,6 +334,48 @@ fn part1(computer: intcode::Computer) -> Result<(), String> {
 
     map.print(droid.current_position);
     println!("Part 1: {}", return_path.len());
-    Ok(())
+    Ok(map)
 }
 
+fn part2(map: Map, computer: intcode::Computer) -> Result<(), String> {
+    let mut filled_points: BTreeMap<Point, u32> = BTreeMap::new();
+    let droid = Droid::new(computer);
+
+    let mut generation: u32 = 0;
+    let oxygen_thing_location = *map.points.iter()
+        .filter(|(k, v)| **v == State::OxygenThing)
+        .nth(0)
+        .ok_or("couldn't find oxygen thing from part 1".to_string())?.0;    
+    filled_points.insert(oxygen_thing_location, generation);
+
+    loop {
+        let prev_count = filled_points.len();
+        let prev_generation = generation;
+        generation += 1;
+
+        let mut new_filled_points: BTreeMap<Point, u32> = BTreeMap::new();
+        for (k, v) in filled_points.iter() {
+            if *v == prev_generation {
+                let mut add_point_if_needed = |point: Point| {
+                    if map.get_point(point) == State::Clear && !filled_points.contains_key(&point) {
+                        new_filled_points.insert(point, generation);
+                    }
+                };
+                add_point_if_needed(*k + Direction::North.vector());
+                add_point_if_needed(*k + Direction::South.vector());
+                add_point_if_needed(*k + Direction::East.vector());
+                add_point_if_needed(*k + Direction::West.vector());
+            }
+        }
+
+        filled_points.append(&mut new_filled_points);
+
+        if filled_points.len() == prev_count {
+            break;
+        }
+    }
+
+    println!("Part 2: {}", generation - 1);
+
+    Ok(())
+}
