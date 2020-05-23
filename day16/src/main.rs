@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::time;
 
 type Num = i64;
 
@@ -8,7 +9,6 @@ fn main() {
     let input_data = fs::read_to_string(input_path).unwrap();
     let input = digits_of(input_data.trim());
 
-    //part1(vec!(1, 2, 3, 4, 5))?;
     part1(&input);
     part2(&input);
 }
@@ -54,7 +54,7 @@ fn part1(message: &[Num]) {
     let mut message = message.to_vec();
 
     for _ in 0..100 {
-        message = apply_fft_faster(&message)
+        message = apply_fft_faster(&message, None)
     }
 
     println!("Part 1: {:?}", &message[0..8]);
@@ -62,19 +62,26 @@ fn part1(message: &[Num]) {
 
 fn part2(input: &[Num]) {
     let count = 10_000;
-    let mut message: Vec<Num> = Vec::with_capacity(input.len() * count);
-    for _ in 0..count {
-        message.extend_from_slice(input);
-    }
+    let mut message = repeat_range(input, count);
 
     for i in 0..100 {
         println!("Iteration {}", i);
-        message = apply_fft_faster(&message);
+        message = apply_fft_faster(&message, Some(input.len()));
     }
 
     let message_offset = get_message_offset(&input[0..7]);
 
     println!("Part 2: {:?}", &message[message_offset .. (message_offset + 8)])
+}
+
+fn repeat_range(input: &[Num], n: usize) -> Vec<Num> {
+    let mut result: Vec<Num> = Vec::with_capacity(input.len() * n);
+
+    for _ in 0..n {
+        result.extend_from_slice(input);
+    }
+
+    result
 }
 
 #[derive(Debug)]
@@ -94,21 +101,18 @@ impl<'a> SumTreeNode<'a> {
         let mid = data.len() / 2;
         let left_range = &data[..mid];
         let right_range = &data[mid..];
+        let make_children = left_range.len() > 128;
 
-        let left_child = if left_range.len() > 4 {
+        let make_child = |range: &'a [Num]| if make_children {
             Some(Box::new(Self::new(
-                left_range,
+                range,
             )))
         } else {
             None
         };
-        let right_child = if right_range.len() > 4 {
-            Some(Box::new(Self::new(
-                right_range,
-            )))
-        } else {
-            None
-        };
+
+        let left_child = make_child(left_range);
+        let right_child = make_child(right_range);
 
         assert!(left_child.is_none() == right_child.is_none());
 
@@ -138,6 +142,10 @@ impl<'a> SumTreeNode<'a> {
         let start = std::cmp::min(start, self.data.len());
         let end = std::cmp::min(end, self.data.len());
 
+        self.sum_of_range_internal(start, end)
+    }
+
+    fn sum_of_range_internal(&self, start: usize, end: usize) -> i64 {
         if start == end {
             return 0;
         }
@@ -149,12 +157,12 @@ impl<'a> SumTreeNode<'a> {
         if self.has_children() {
             let mid = self.left_child.as_ref().unwrap().data.len();
             if end <= mid {
-                self.left_child.as_ref().unwrap().sum_of_range(start, end)
+                self.left_child.as_ref().unwrap().sum_of_range_internal(start, end)
             } else if start >= mid {
-                self.right_child.as_ref().unwrap().sum_of_range(start - mid, end - mid)
+                self.right_child.as_ref().unwrap().sum_of_range_internal(start - mid, end - mid)
             } else {
-                let left_sum = self.left_child.as_ref().unwrap().sum_of_range(start, mid);
-                let right_sum = self.right_child.as_ref().unwrap().sum_of_range(0, end - mid);
+                let left_sum = self.left_child.as_ref().unwrap().sum_of_range_internal(start, mid);
+                let right_sum = self.right_child.as_ref().unwrap().sum_of_range_internal(0, end - mid);
                 left_sum + right_sum
             }
         } else {
@@ -174,15 +182,16 @@ fn test_sum_of_range() {
     assert_eq!(node.sum_of_range(2, 6), 14);
 }
 
-fn apply_fft_faster(input: &[Num]) -> Vec<Num> {
+fn apply_fft_faster(input: &[Num], cycle_length: Option<usize>) -> Vec<Num> {
+    let mut start_time = time::Instant::now();
     let mut result: Vec<Num> = Vec::new();
     let sum_tree = SumTreeNode::new(input);
 
-    //dbg!(&sum_tree);
-
     for row in 0..input.len() {
-        if row % 10000 == 0 {
-            println!("  Row: {}", row);
+        if row % 100000 == 0 {
+            let current_time = time::Instant::now();
+            println!("  Row: {} {}ms", row, (current_time - start_time).as_millis());
+            start_time = current_time;
         }
         let pattern_len = row + 1;
         let mut sum: Num = 0;
@@ -198,6 +207,16 @@ fn apply_fft_faster(input: &[Num]) -> Vec<Num> {
                 sum_tree.sum_of_range(sub_start, sub_end);
 
             start += pattern_len * 4;
+
+            if let Some(cycle_length) = cycle_length {
+                if start % cycle_length == 0 {
+                    let additional_cycles = input.len() / start;
+                    if additional_cycles > 1 {
+                        start = start * additional_cycles;
+                        sum = sum * (additional_cycles as i64);
+                    }
+                }
+            }
         }
 
         result.push((sum.abs() % 10) as Num);
@@ -207,15 +226,27 @@ fn apply_fft_faster(input: &[Num]) -> Vec<Num> {
 }
 
 #[test]
-fn test_apply_fft_faster() {
-    assert_eq!(apply_fft_faster(&digits_of("12345678")), digits_of("48226158"));
+fn test_apply_fft_faster_1() {
+    assert_eq!(apply_fft_faster(&digits_of("12345678"), None), digits_of("48226158"));
 
     let mut message = digits_of("80871224585914546619083218645595");
 
     for _ in 0..100 {
-        message = apply_fft_faster(&message)
+        message = apply_fft_faster(&message, None)
     }
 
-    assert_eq!(&message[0..8], &digits_of("24176176")[..])
+    assert_eq!(&message[0..8], &digits_of("24176176")[..]);
+}
+
+#[test]
+fn test_apply_fft_faster_2() {
+    let input = digits_of("03036732577212944063491565474664");
+    let message_offset = get_message_offset(&input[0..7]);
+    let mut message = repeat_range(&input, 10000);
+    for _ in 0..100 {
+        message = apply_fft_faster(&message, Some(input.len()));
+    }
+    let result = &message[message_offset .. (message_offset + 8)];
+    assert_eq!(result, &digits_of("84462026")[..]);
 }
 
